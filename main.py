@@ -73,42 +73,42 @@ refresh_cookie()
 index = 1
 lastTime = int(time.time()) - 30
 retry_count = 0
-    while retry_count < MAX_RETRIES:
-        try:
-            response = requests.post(
-                READ_URL,
-                headers=headers,
-                cookies=cookies,
-                data=json.dumps(data, separators=(',', ':')),
-                timeout=10
-            )
-            resData = response.json()
-            logging.info(f"📕 response: {resData}")
-            
-            if 'succ' in resData:
-                if 'synckey' in resData:
-                    lastTime = thisTime
-                    index += 1
-                    time.sleep(30)
-                    logging.info(f"✅ 阅读成功，阅读进度：{(index - 1) * 0.5} 分钟")
-                    break  # 这次成功了，跳出 retry 循环
-                else:
-                    logging.warning("❌ 无 synckey, 尝试修复...")
-                    fix_no_synckey()
-                    break  # 视为成功，只是不影响时长
+while retry_count < MAX_RETRIES:
+    try:
+        response = requests.post(
+            READ_URL,
+            headers=headers,
+            cookies=cookies,
+            data=json.dumps(data, separators=(',', ':')),
+            timeout=10
+        )
+        resData = response.json()
+        logging.info(f"📕 response: {resData}")
+
+        if 'succ' in resData:
+            if 'synckey' in resData:
+                lastTime = thisTime
+                index += 1
+                time.sleep(30)
+                logging.info(f"✅ 阅读成功，阅读进度：{(index - 1) * 0.5} 分钟")
+                break  # 这次成功了，跳出 retry 循环
             else:
-                logging.warning("❌ cookie 已过期，尝试刷新...")
-                refresh_cookie()
-                retry_count += 1
-                time.sleep(RETRY_DELAY)
-        except requests.exceptions.RequestException as e:
-            logging.error(f"📡 网络请求失败（第 {retry_count + 1} 次）：{e}")
+                logging.warning("❌ 无 synckey, 尝试修复...")
+                fix_no_synckey()
+                break  # 视为成功，只是不影响时长
+        else:
+            logging.warning("❌ cookie 已过期，尝试刷新...")
+            refresh_cookie()
             retry_count += 1
             time.sleep(RETRY_DELAY)
+    except requests.exceptions.RequestException as e:
+        logging.error(f"📡 网络请求失败（第 {retry_count + 1} 次）：{e}")
+        retry_count += 1
+        time.sleep(RETRY_DELAY)
 
-    else:
-        logging.error(f"⛔ 超过最大重试次数，跳过第 {index} 次阅读")
-        index += 1  # 不死循环，失败也跳过
+else:
+    logging.error(f"⛔ 超过最大重试次数，跳过第 {index} 次阅读")
+    index += 1  # 不死循环，失败也跳过
 
 logging.info("🎉 阅读脚本已完成！")
 
