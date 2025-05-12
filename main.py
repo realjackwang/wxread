@@ -72,7 +72,7 @@ def refresh_cookie():
 refresh_cookie()
 index = 1
 lastTime = int(time.time()) - 30
- retry_count = 0
+retry_count = 0
     while retry_count < MAX_RETRIES:
         try:
             response = requests.post(
