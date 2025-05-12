@@ -20,6 +20,8 @@ COOKIE_DATA = {"rq": "%2Fweb%2Fbook%2Fread"}
 READ_URL = "https://weread.qq.com/web/book/read"
 RENEW_URL = "https://weread.qq.com/web/login/renewal"
 FIX_SYNCKEY_URL = "https://weread.qq.com/web/book/chapterInfos"
+MAX_RETRIES = 3  # 每次阅读最多重试3次
+RETRY_DELAY = 10  # 每次重试之间等待10秒
 
 
 def encode_data(data):
@@ -70,36 +72,43 @@ def refresh_cookie():
 refresh_cookie()
 index = 1
 lastTime = int(time.time()) - 30
-while index <= READ_NUM:
-    data.pop('s')
-    data['b'] = random.choice(book)
-    data['c'] = random.choice(chapter)
-    thisTime = int(time.time())
-    data['ct'] = thisTime
-    data['rt'] = thisTime - lastTime
-    data['ts'] = int(thisTime * 1000) + random.randint(0, 1000)
-    data['rn'] = random.randint(0, 1000)
-    data['sg'] = hashlib.sha256(f"{data['ts']}{data['rn']}{KEY}".encode()).hexdigest()
-    data['s'] = cal_hash(encode_data(data))
+ retry_count = 0
+    while retry_count < MAX_RETRIES:
+        try:
+            response = requests.post(
+                READ_URL,
+                headers=headers,
+                cookies=cookies,
+                data=json.dumps(data, separators=(',', ':')),
+                timeout=10
+            )
+            resData = response.json()
+            logging.info(f"📕 response: {resData}")
+            
+            if 'succ' in resData:
+                if 'synckey' in resData:
+                    lastTime = thisTime
+                    index += 1
+                    time.sleep(30)
+                    logging.info(f"✅ 阅读成功，阅读进度：{(index - 1) * 0.5} 分钟")
+                    break  # 这次成功了，跳出 retry 循环
+                else:
+                    logging.warning("❌ 无 synckey, 尝试修复...")
+                    fix_no_synckey()
+                    break  # 视为成功，只是不影响时长
+            else:
+                logging.warning("❌ cookie 已过期，尝试刷新...")
+                refresh_cookie()
+                retry_count += 1
+                time.sleep(RETRY_DELAY)
+        except requests.exceptions.RequestException as e:
+            logging.error(f"📡 网络请求失败（第 {retry_count + 1} 次）：{e}")
+            retry_count += 1
+            time.sleep(RETRY_DELAY)
 
-    logging.info(f"⏱️ 尝试第 {index} 次阅读...")
-    logging.info(f"📕 data: {data}")
-    response = requests.post(READ_URL, headers=headers, cookies=cookies, data=json.dumps(data, separators=(',', ':')))
-    resData = response.json()
-    logging.info(f"📕 response: {resData}")
-
-    if 'succ' in resData:
-        if 'synckey' in resData:
-            lastTime = thisTime
-            index += 1
-            time.sleep(30)
-            logging.info(f"✅ 阅读成功，阅读进度：{(index - 1) * 0.5} 分钟")
-        else:
-            logging.warning("❌ 无synckey, 尝试修复...")
-            fix_no_synckey()
     else:
-        logging.warning("❌ cookie 已过期，尝试刷新...")
-        refresh_cookie()
+        logging.error(f"⛔ 超过最大重试次数，跳过第 {index} 次阅读")
+        index += 1  # 不死循环，失败也跳过
 
 logging.info("🎉 阅读脚本已完成！")
 
