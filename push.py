@@ -113,7 +113,7 @@ class PushNotification:
 """外部调用"""
 
 # 统一推送接口，支持所有渠道
-def push_notification(content, method, task_name, status, source="weread_script"):
+def push_notification(content, method, task_name, status, source="GitHub"):
     """
     一个统一的推送接口，用于向各种渠道发送通知。
     参数:
