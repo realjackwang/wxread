@@ -4,7 +4,8 @@ import time
 import json
 import requests
 import logging
-from config import PUSHPLUS_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_BOT_TOKEN, WXPUSHER_SPT
+
+from config import PUSHPLUS_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_BOT_TOKEN, WXPUSHER_SPT, VERCEL_API_URL
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,6 @@ class PushNotification:
         }
         self.wxpusher_simple_url = "https://wxpusher.zjiecode.com/api/send/message/{}/{}"
         
-        # 新增：Vercel API 地址
-        self.vercel_api_url = os.environ.get('VERCEL_API_URL')
-
     def push_pushplus(self, content, token):
         """PushPlus消息推送"""
         attempts = 5
@@ -89,10 +87,10 @@ class PushNotification:
                     logger.info("将在 %d 秒后重试...", sleep_time)
                     time.sleep(sleep_time)
 
-    # 新增: Vercel API 消息推送
     def push_vercel_api(self, source, task_name, status, message):
         """将任务状态发送到 Vercel API"""
-        if not self.vercel_api_url:
+        # 更改：从全局变量 VERCEL_API_URL 获取 URL
+        if not VERCEL_API_URL:
             logger.error("❌ Vercel API URL未设置，无法推送任务状态。")
             return
 
@@ -105,7 +103,7 @@ class PushNotification:
         }
 
         try:
-            response = requests.post(self.vercel_api_url, json=payload, timeout=10)
+            response = requests.post(VERCEL_API_URL, json=payload, timeout=10)
             response.raise_for_status()
             logger.info("✅ Vercel API 推送成功: %s", response.text)
         except requests.exceptions.RequestException as e:
