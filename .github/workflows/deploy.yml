@@ -45,6 +45,7 @@ jobs:
         WXPUSHER_SPT: ${{ secrets.WXPUSHER_SPT }}
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        VERCEL_API_URL: ${{ secrets.VERCEL_API_URL }}
         READ_NUM: ${{ vars.READ_NUM }}  # 使用 Repository Variables
 
       run: |
