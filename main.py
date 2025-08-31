@@ -1,4 +1,3 @@
-# main.py 主逻辑：包括字段拼接、模拟请求
 import re
 import json
 import time
@@ -7,7 +6,7 @@ import logging
 import hashlib
 import requests
 import urllib.parse
-from push import push
+from push import push_notification # 更改：导入新的统一推送函数
 from config import data, headers, cookies, READ_NUM, PUSH_METHOD, book, chapter
 
 # 配置日志格式
@@ -20,7 +19,7 @@ COOKIE_DATA = {"rq": "%2Fweb%2Fbook%2Fread"}
 READ_URL = "https://weread.qq.com/web/book/read"
 RENEW_URL = "https://weread.qq.com/web/login/renewal"
 FIX_SYNCKEY_URL = "https://weread.qq.com/web/book/chapterInfos"
-MAX_RETRIES = 3  # 每次阅读最多重试3次
+MAX_RETRIES = 3   # 每次阅读最多重试3次
 RETRY_DELAY = 10  # 每次重试之间等待10秒
 
 
@@ -46,7 +45,7 @@ def cal_hash(input_string):
 def get_wr_skey():
     """刷新cookie密钥"""
     response = requests.post(RENEW_URL, headers=headers, cookies=cookies,
-                             data=json.dumps(COOKIE_DATA, separators=(',', ':')))
+                            data=json.dumps(COOKIE_DATA, separators=(',', ':')))
     for cookie in response.headers.get('Set-Cookie', '').split(';'):
         if "wr_skey" in cookie:
             return cookie.split('=')[-1][:8]
@@ -54,7 +53,7 @@ def get_wr_skey():
 
 def fix_no_synckey():
     requests.post(FIX_SYNCKEY_URL, headers=headers, cookies=cookies,
-                             data=json.dumps({"bookIds":["3300060341"]}, separators=(',', ':')))
+                            data=json.dumps({"bookIds":["3300060341"]}, separators=(',', ':')))
 
 def refresh_cookie():
     logging.info(f"🍪 刷新cookie")
@@ -66,7 +65,8 @@ def refresh_cookie():
     else:
         ERROR_CODE = "❌ 无法获取新密钥或者WXREAD_CURL_BASH配置有误，终止运行。"
         logging.error(ERROR_CODE)
-        push(ERROR_CODE, PUSH_METHOD)
+        # 更改：使用新的推送函数
+        push_notification(ERROR_CODE, PUSH_METHOD, "微信阅读", "failure")
         raise Exception(ERROR_CODE)
 
 refresh_cookie()
@@ -124,10 +124,12 @@ while index <= READ_NUM:
     
     else:
         logging.error(f"⛔ 超过最大重试次数，跳过第 {index} 次阅读")
+        # 更改：使用新的推送函数
+        push_notification(f"第 {index} 次阅读失败，超过最大重试次数", PUSH_METHOD, "微信阅读", "failure")
         index += 1  # 不死循环，失败也跳过
     
-    logging.info("🎉 阅读脚本已完成！")
+logging.info("🎉 阅读脚本已完成！")
 
-if PUSH_METHOD not in (None, ''):
-    logging.info("⏱️ 开始推送...")
-    push(f"🎉 微信读书自动阅读完成！\n⏱️ 阅读时长：{(index - 1) * 0.5}分钟。", PUSH_METHOD)
+# 更改：使用新的推送函数，只在主任务完成后推送一次
+final_message = f"🎉 微信读书自动阅读完成！\n⏱️ 阅读时长：{(index - 1) * 0.5}分钟。"
+push_notification(final_message, PUSH_METHOD, "微信阅读", "success")

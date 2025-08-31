@@ -1,4 +1,3 @@
-# push.py 支持 PushPlus 、wxpusher、Telegram 的消息推送模块
 import os
 import random
 import time
@@ -21,6 +20,9 @@ class PushNotification:
             'https': os.getenv('https_proxy')
         }
         self.wxpusher_simple_url = "https://wxpusher.zjiecode.com/api/send/message/{}/{}"
+        
+        # 新增：Vercel API 地址
+        self.vercel_api_url = os.environ.get('VERCEL_API_URL')
 
     def push_pushplus(self, content, token):
         """PushPlus消息推送"""
@@ -64,9 +66,9 @@ class PushNotification:
                 # 代理失败后直连
                 response = requests.post(url, json=payload, timeout=30)
                 response.raise_for_status()
-                return True
             except Exception as e:
                 logger.error("❌ Telegram发送失败: %s", e)
+            finally:
                 return False
     
     def push_wxpusher(self, content, spt):
@@ -87,22 +89,51 @@ class PushNotification:
                     logger.info("将在 %d 秒后重试...", sleep_time)
                     time.sleep(sleep_time)
 
+    # 新增: Vercel API 消息推送
+    def push_vercel_api(self, source, task_name, status, message):
+        """将任务状态发送到 Vercel API"""
+        if not self.vercel_api_url:
+            logger.error("❌ Vercel API URL未设置，无法推送任务状态。")
+            return
+
+        payload = {
+            "source": source,
+            "task_name": task_name,
+            "status": status,
+            "message": message,
+            "timestamp": int(time.time())
+        }
+
+        try:
+            response = requests.post(self.vercel_api_url, json=payload, timeout=10)
+            response.raise_for_status()
+            logger.info("✅ Vercel API 推送成功: %s", response.text)
+        except requests.exceptions.RequestException as e:
+            logger.error("❌ Vercel API 推送失败: %s", e)
+
 
 """外部调用"""
 
-
-def push(content, method):
-    """统一推送接口，支持 PushPlus、Telegram 和 WxPusher"""
+# 统一推送接口，支持所有渠道
+def push_notification(content, method, task_name, status, source="weread_script"):
+    """
+    一个统一的推送接口，用于向各种渠道发送通知。
+    参数:
+    - content: 推送消息的主体内容。
+    - method: 推送渠道 (如 'pushplus', 'telegram', 'wxpusher', 'vercel_api')
+    - task_name: 任务名称，用于 Vercel API。
+    - status: 任务状态 ('success' 或 'failure')，用于 Vercel API。
+    - source: 任务来源，用于 Vercel API。
+    """
     notifier = PushNotification()
 
-    if method == "pushplus":
-        token = PUSHPLUS_TOKEN
-        return notifier.push_pushplus(content, token)
+    if method == "vercel_api":
+        notifier.push_vercel_api(source, task_name, status, content)
+    elif method == "pushplus":
+        notifier.push_pushplus(content, PUSHPLUS_TOKEN)
     elif method == "telegram":
-        bot_token = TELEGRAM_BOT_TOKEN
-        chat_id = TELEGRAM_CHAT_ID
-        return notifier.push_telegram(content, bot_token, chat_id)
+        notifier.push_telegram(content, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
     elif method == "wxpusher":
-        return notifier.push_wxpusher(content, WXPUSHER_SPT)
+        notifier.push_wxpusher(content, WXPUSHER_SPT)
     else:
         raise ValueError("❌ 无效的通知渠道，请选择 'pushplus'、'telegram' 或 'wxpusher'")
